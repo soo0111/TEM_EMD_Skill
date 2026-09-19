@@ -2,9 +2,9 @@
 
 Agent skill (Claude Code / Codex) for TEM sessions saved as Thermo Fisher Velox `.emd`:
 
-** HRTEM Images: EMD → MRC → restore orientation → (HRTEM) rotate + crop → PNG + SVG with a bottom-right scale bar.**
+_**HRTEM Images: EMD → MRC → restore orientation → (HRTEM) rotate + crop → PNG + SVG with a bottom-right scale bar.**_
 
-** STEM Images: EMD → MRC → restore orientation → PNG + SVG with a bottom-right scale bar.**
+_**STEM Images: EMD → MRC → restore orientation → PNG + SVG with a bottom-right scale bar.**_
 
 - MRC is stored flipped on both axes; the final PNG/SVG un-flips both, and are always rendered from the MRC (not straight from EMD).
 - HRTEM rotation: you give a direction and angle, the skill previews **both directions** on an image you pick, you confirm, then all HRTEM images are rotated and cropped to the largest square without empty corners.
@@ -22,8 +22,11 @@ Requires Python 3 with `pip install hyperspy mrcfile scipy matplotlib numpy`.
 ## Use
 
 Ask the agent, e.g. 
+
 *"Use TEM_EMD on this folder; rotate HRTEM 2° counter-clockwise."*
+
 *"/TEM_EMD Please use this skill on this folder; rotate HRTEM 2° counter-clockwise for 23 image."*
+
 Or run the scripts by hand from the data folder:
 
 ```bash
