@@ -3,6 +3,7 @@
 Agent skill (Claude Code / Codex) for TEM sessions saved as Thermo Fisher Velox `.emd`:
 
 ** HRTEM Images: EMD → MRC → restore orientation → (HRTEM) rotate + crop → PNG + SVG with a bottom-right scale bar.**
+
 ** STEM Images: EMD → MRC → restore orientation → PNG + SVG with a bottom-right scale bar.**
 
 - MRC is stored flipped on both axes; the final PNG/SVG un-flips both, and are always rendered from the MRC (not straight from EMD).
