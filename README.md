@@ -28,3 +28,8 @@ python TEM_EMD/scripts/process_emd.py                  # EMD -> MRC/
 python TEM_EMD/scripts/preview_rotation.py 0023 2.1    # CCW vs CW preview
 python TEM_EMD/scripts/mrc_to_scalebar.py --ccw 2.1    # PNG/SVG in Scalebar/ (negative = clockwise)
 ```
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
