@@ -5,7 +5,7 @@ description: Process Thermo Fisher Velox .emd files from a TEM/STEM session. Ima
 
 # TEM_EMD
 
-Image pipeline: **EMD → MRC (flipped) → un-flip → [HRTEM: rotate + crop] → percentile contrast → scale bar → PNG + SVG.**
+Image pipeline: **EMD → MRC (flipped) → un-flip → [HRTEM: rotate + crop] → percentile contrast → scale bar → PNG + SVG (+ the same without scale bar, for editing).**
 EDS pipeline: **inspect → colours (user confirms) → map** (`scripts/eds_map.py`, needs the MRC step first).
 Scripts are in `scripts/` next to this file. They read the **current working directory**, so `cd` into the
 data folder (the one holding the `.emd` files) and call them by absolute path.
@@ -37,10 +37,12 @@ Set `MPLBACKEND=Agg`. `SKILL_DIR` = the folder containing this SKILL.md
       horizontal, fringes level) and **wait for the user to confirm** direction and angle.
    d. If the user gave no angle, ask; if they want other angles or another image, rerun and show again.
 3. **Final render** with the confirmed angle (negative = clockwise):
-   `python "$SKILL_DIR/scripts/mrc_to_scalebar.py" --ccw 2.1` → `Scalebar/<stem>.png` + `.svg`.
+   `python "$SKILL_DIR/scripts/mrc_to_scalebar.py" --ccw 2.1` → `Scalebar/<stem>.png` + `.svg`, and the same image
+   without the bar in `NoScalebar/<stem>.png` + `.svg` (for editing).
    Omit `--ccw` when the session has no HRTEM or the user wants no rotation.
-4. **Verify**: log shows 0 FAIL; ok + skip = number of `.mrc`; PNG count = SVG count = ok. Open one STEM and one
-   HRTEM PNG: upright, scale bar bottom-right and readable, no black corners after rotation.
+4. **Verify**: log shows 0 FAIL; ok + skip = number of `.mrc`; PNG count = SVG count = ok in both `Scalebar/` and
+   `NoScalebar/`. Open one STEM and one HRTEM PNG: upright, scale bar bottom-right and readable, no black corners after
+   rotation. If there are low-magnification images, open one: the label must be in µm, not nm.
 
 ## EDS colour maps (only when the folder has `SI` .emd files and the user wants EDS maps)
 
@@ -69,8 +71,8 @@ Everything writes to `EDS Data/`. Run `python "$SKILL_DIR/scripts/eds_map.py" <s
      of a run), Post = Average 3. The filter is the agent's call; optionally show `filters [--stem 0058]` →
      `EDS Data/filter_preview.png` (Velox map vs sigma candidates with FWHM and expected noise) and say which sigma you use.
      Override with `--sigma`, `--post`, `--frames a:b` (Velox frame range), `--maps intensity`.
-8. **`map`** → `EDS Data/<Velox_Pre…_Post… | Raw_PreGauss…_PostAvg…>/`: per element PNG+SVG, Additive and MaxProjection composites,
-   `<stem>__Montage` (HAADF | each element | composite, paper-style, PNG+SVG) and `<stem>__report.txt/json`
+8. **`map`** → `EDS Data/<Velox_Pre…_Post… | Raw_PreGauss…_PostAvg…>/`: per element PNG+SVG, Additive and MaxProjection composites
+   (both also without scale bar in the `NoScalebar/` subfolder), `<stem>__Montage` (HAADF | each element | composite, paper-style, PNG+SVG) and `<stem>__report.txt/json`
    (mode, filters, counts/px, expected noise, calibration r, warnings, and the **equivalent Velox settings** so the user can re-export
    from Velox). Open the montage and one composite, read the warnings, and tell the user: mode, filter values, warnings.
 9. `map` needs the MRC folder for Velox maps, HAADF and weight calibration; raw mode still runs without it (uncalibrated, no HAADF panel).
@@ -82,11 +84,16 @@ Everything writes to `EDS Data/`. Run `python "$SKILL_DIR/scripts/eds_map.py" <s
   already upright.
 - PNG/SVG always come from the **MRC**, never straight from EMD (direct EMD render was low-contrast/blurry).
 - Contrast: 1–99 percentile stretch. Scale bar: white bar, bold label, bottom-right, length ≈ 25% width
-  rounded to 1/2/5×10ⁿ nm, font size ∝ image width (25 pt at 1024 px) so labels look the same across sizes.
+  rounded to 1/2/5×10ⁿ nm (label in µm from 1000 nm), font size ∝ image width (25 pt at 1024 px) so labels look the
+  same across sizes.
+- Pixel size unit: Velox stores low-magnification axes in **µm** and high-magnification ones in nm. The MRC header has
+  no unit, so the MRC voxel size keeps the EMD number and `load_upright()` converts it to nm with the unit from the
+  `.mrc.txt` sidecar. Keep the sidecar next to its MRC.
 - Rotation: bicubic; scipy positive angle = counter-clockwise on screen; then the largest centred square without
   empty corners is cropped (so rotated HRTEM outputs are square and slightly smaller; the scale bar is
   recomputed for the cropped width). STEM images are never rotated.
-- Scripts must run with cwd = data folder; outputs go to `MRC/`, `Scalebar/`, `RotationPreview/`, `EDS Data/` there.
+- Scripts must run with cwd = data folder; outputs go to `MRC/`, `Scalebar/`, `NoScalebar/`, `RotationPreview/`,
+  `EDS Data/` there.
 - EDS: Velox's element maps are **composition fractions** (per pixel the quantified elements sum to 1), so raw mode builds
   fractions too (weights fitted to the Velox maps of the same file, else 1 = "relative-intensity fractions, uncalibrated").
   Velox filters are spatial blurs: Pre (on the per-pixel spectra, before quantification) and Post (on the maps); UI types
@@ -97,7 +104,8 @@ Everything writes to `EDS Data/`. Run `python "$SKILL_DIR/scripts/eds_map.py" <s
 
 - 2-D elemental maps inside SI files (Zr, O, …) also become grey MRC/PNG in step 3; the colour versions come from `eds_map.py`.
 - Long MRC step: log is buffered — check `MRC/` file count for progress.
-- Mixed pixel sizes are fine: each image uses its own MRC voxel size for the scale bar.
+- Mixed pixel sizes and units are fine: each image uses its own MRC voxel size and sidecar unit for the scale bar.
+  MRC folders made before 2026-10-07 do not need re-conversion; rerun `mrc_to_scalebar.py` to fix old µm labels.
 - Assumes Thermo Fisher Velox `.emd` and `Camera Ceta` in HRTEM filenames; change `HRTEM_MARK` in `mrc_to_scalebar.py` for other cameras.
 - The rotation angle is session-specific (one session needed CCW 2.1°) — always preview, never reuse blindly.
 - **EDS maps are qualitative.** Counts are very sparse (often 0.02–0.1 per pixel per element), so even filtered maps show ~30–60 %

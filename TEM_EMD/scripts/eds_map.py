@@ -374,13 +374,16 @@ def _draw_scalebar(ax, w, h, px_nm):
             va="bottom", zorder=6, fontsize=_font_size_pt(w), fontweight=SCALEBAR_FONT_WEIGHT)
 
 
-def render_rgb(rgb, px_nm, out_stem, out_dir):
+def render_rgb(rgb, px_nm, out_stem, out_dir, bare_dir=None):
     h, w = rgb.shape[:2]
     fig = plt.figure(figsize=(w / DPI, h / DPI), dpi=DPI)
     ax = plt.Axes(fig, [0, 0, 1, 1])
     ax.set_axis_off()
     fig.add_axes(ax)
     ax.imshow(rgb, extent=(0, w, h, 0))
+    if bare_dir is not None:
+        for ext in ("png", "svg"):
+            fig.savefig(bare_dir / f"{out_stem}.{ext}", dpi=DPI, pad_inches=0)
     _draw_scalebar(ax, w, h, px_nm)
     for ext in ("png", "svg"):
         fig.savefig(out_dir / f"{out_stem}.{ext}", dpi=DPI, pad_inches=0)
@@ -632,13 +635,15 @@ def cmd_map(args):
             if mode == "raw":
                 args.sigma_shared = rep["sigma_px"]
             out = OUT_DIR / out_label(rep)
-            out.mkdir(parents=True, exist_ok=True)
+            bare = out / "NoScalebar"   # element maps + composites without bar, for editing
+            bare.mkdir(parents=True, exist_ok=True)
             norm = _norm(maps)
             for e, m in maps.items():
-                render_with_scalebar_arr(_percentile_u8(m), px, f"{emd.stem}__{e}", out, cmap=_cmap(cols[e]))
+                render_with_scalebar_arr(_percentile_u8(m), px, f"{emd.stem}__{e}", out, cmap=_cmap(cols[e]),
+                                         bare_dir=bare)
             ce = [e for e in comp if e in norm]
             for m, lab in (("sum", "Additive"), ("max", "MaxProjection")):
-                render_rgb(composite(norm, cols, ce, m), px, f"{emd.stem}__Composite_{''.join(ce)}_{lab}", out)
+                render_rgb(composite(norm, cols, ce, m), px, f"{emd.stem}__Composite_{''.join(ce)}_{lab}", out, bare)
             h = None
             if res["haadf"] is not None:
                 ha, _ = load_upright(res["haadf"])

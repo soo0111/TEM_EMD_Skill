@@ -11,7 +11,8 @@ _**3. EDS (SI files): elements + Velox filter settings → confirmed colours →
 - MRC is stored flipped on both axes; the final PNG/SVG un-flips both, and are always rendered from the MRC (not straight from EMD).
 - HRTEM rotation: you give a direction and angle, the skill previews **both directions** on an image you pick, you confirm, then all HRTEM images are rotated and cropped to the largest square without empty corners.
 - EDS: reads the Velox Pre/Post-filter settings from the EMD. Files you already filtered in Velox are coloured as saved (no double smoothing); raw files are rebuilt from the SI cube with auto-chosen filters. Elements and colours are confirmed with you before mapping. Maps are qualitative, not a quantification.
-- Scale bar: white, bottom-right, label font size proportional to image width.
+- Scale bar: white, bottom-right, label font size proportional to image width; nm or µm picked from the image's own pixel size (low-magnification images are labelled in µm).
+- No-scale-bar copies for editing: every image, EDS element map and composite is also saved without the bar in a `NoScalebar/` folder (same file names, PNG + SVG).
 
 ## Install
 
@@ -37,7 +38,7 @@ Or run the scripts by hand from the data folder:
 ```bash
 python TEM_EMD/scripts/process_emd.py                  # EMD -> MRC/
 python TEM_EMD/scripts/preview_rotation.py 0023 2.1    # CCW vs CW preview
-python TEM_EMD/scripts/mrc_to_scalebar.py --ccw 2.1    # PNG/SVG in Scalebar/ (negative = clockwise)
+python TEM_EMD/scripts/mrc_to_scalebar.py --ccw 2.1    # PNG/SVG in Scalebar/ + NoScalebar/ (negative = clockwise)
 ```
 
 EDS colour maps (after `process_emd.py`):

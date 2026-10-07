@@ -4,12 +4,15 @@ Run with the data folder as cwd:
     python mrc_to_scalebar.py                 # no rotation
     python mrc_to_scalebar.py --ccw 2.1       # HRTEM rotated 2.1 deg counter-clockwise (on screen)
     python mrc_to_scalebar.py --ccw -2.1      # ... clockwise
-Reads MRC/*.mrc, writes Scalebar/<stem>.png/.svg. MRC is un-flipped on both axes
-(process_emd.py flips both). HRTEM = filename contains HRTEM_MARK ("Camera Ceta").
+Reads MRC/*.mrc, writes Scalebar/<stem>.png/.svg and the same without bar in NoScalebar/.
+MRC is un-flipped on both axes (process_emd.py flips both). HRTEM = filename contains HRTEM_MARK ("Camera Ceta").
+MRC voxel size is in the EMD axis unit (nm, or µm at low mag); the unit is read from the .mrc.txt sidecar.
 """
 import argparse
 import glob
 import os
+import re
+import tempfile
 import traceback
 from pathlib import Path
 
@@ -19,8 +22,8 @@ import scipy.ndimage as ndi
 from matplotlib.patches import Rectangle
 
 from process_emd import (
-    _font_size_pt, _scalebar, _spatial_flip,
-    CMAP, DPI, OUT_MRC_DIR, OUT_PNGSVG_DIR,
+    _UNIT_TO_NM, _font_size_pt, _scalebar, _spatial_flip,
+    CMAP, DPI, OUT_MRC_DIR, OUT_NOBAR_DIR, OUT_PNGSVG_DIR,
     SCALEBAR_COLOR, SCALEBAR_FONT_WEIGHT,
     SCALEBAR_HEIGHT_FRACTION, SCALEBAR_LABEL_GAP_FRACTION, SCALEBAR_MARGIN_FRACTION,
 )
@@ -70,23 +73,39 @@ def _is_2d_image(path):
         return int(m.header.nz) == 1 and int(m.header.ny) > 1
 
 
+def _nm_per_unit(path):
+    """nm per MRC voxel-size unit, from the .mrc.txt sidecar written by process_emd.py
+    (Velox gives µm at low magnification, nm at high; the MRC header has no unit)."""
+    side = Path(f"{path}.txt")
+    m = re.search(r"units='([^']*)'", side.read_text(encoding="utf-8")) if side.exists() else None
+    unit = m.group(1).strip().lower() if m else None
+    if unit in _UNIT_TO_NM:
+        return _UNIT_TO_NM[unit]
+    # TODO(human): no sidecar (unit is None) or unknown unit (e.g. '1/nm' diffraction) -> what to do?
+    return 1.0
+
+
 def load_upright(path):
     """MRC -> (float32 image with original orientation restored, pixel size nm)."""
     import mrcfile
 
     with mrcfile.open(str(path), mode="r", permissive=True) as m:
         arr = np.asarray(m.data, dtype=np.float32)
-        px = float(m.voxel_size.x)
+        px = float(m.voxel_size.x) * _nm_per_unit(path)
     return _spatial_flip(arr, "both"), px
 
 
-def render_with_scalebar_arr(img_u8, pixel_size_nm, out_stem, output_dir, cmap=CMAP):
+def render_with_scalebar_arr(img_u8, pixel_size_nm, out_stem, output_dir, cmap=CMAP, bare_dir=None):
+    """PNG+SVG with scale bar in output_dir; if bare_dir, also the same image without bar there."""
     h, w = img_u8.shape
     fig = plt.figure(figsize=(w / DPI, h / DPI), dpi=DPI)
     ax = plt.Axes(fig, [0.0, 0.0, 1.0, 1.0])
     ax.set_axis_off()
     fig.add_axes(ax)
     ax.imshow(img_u8, cmap=cmap, vmin=0, vmax=255, extent=(0, w, h, 0))
+    if bare_dir is not None:
+        for ext in ("png", "svg"):
+            fig.savefig(bare_dir / f"{out_stem}.{ext}", dpi=DPI, pad_inches=0)
 
     bar_px, label = _scalebar(pixel_size_nm, w, "nm")
     bar_h = SCALEBAR_HEIGHT_FRACTION * h
@@ -110,7 +129,7 @@ def process_one(path, ccw_deg):
     arr, px = load_upright(path)
     if HRTEM_MARK in path.stem and ccw_deg:
         arr, _ = rotate_crop(arr, ccw_deg)
-    render_with_scalebar_arr(_percentile_u8(arr), px, path.stem, OUT_PNGSVG_DIR)
+    render_with_scalebar_arr(_percentile_u8(arr), px, path.stem, OUT_PNGSVG_DIR, bare_dir=OUT_NOBAR_DIR)
     return "ok"
 
 
@@ -129,6 +148,28 @@ def selftest():
 
     u8 = _percentile_u8(np.random.rand(10, 10) * 1000)
     assert u8.dtype == np.uint8
+
+    # low-mag Velox axes come in µm: pixel size must come back in nm, label in µm
+    import hyperspy.api as hs
+    from process_emd import convert_signal
+
+    s = hs.signals.Signal2D(np.random.rand(32, 48).astype(np.float32))
+    for a in s.axes_manager.signal_axes:
+        a.scale, a.units = 0.005, "µm"
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        convert_signal(s, d / "st.mrc", overwrite=True)
+        _, px = load_upright(d / "st.mrc")
+        assert abs(px - 5.0) < 1e-3, px
+        assert _scalebar(px, 2048, "nm")[1] == "2 µm"
+
+        # NoScalebar copy: same image, no white bar
+        for sub in ("bar", "bare"):
+            (d / sub).mkdir()
+        render_with_scalebar_arr(np.zeros((64, 64), np.uint8), px, "z", d / "bar", bare_dir=d / "bare")
+        assert plt.imread(d / "bare" / "z.png")[..., :3].max() == 0
+        assert plt.imread(d / "bar" / "z.png")[..., :3].max() == 1
+        assert (d / "bare" / "z.svg").exists()
     print("selftest OK")
 
 
@@ -138,6 +179,7 @@ def main():
     args = ap.parse_args()
 
     OUT_PNGSVG_DIR.mkdir(exist_ok=True)
+    OUT_NOBAR_DIR.mkdir(exist_ok=True)
     selftest()
 
     files = sorted(Path(p) for p in glob.glob(glob.escape(str(OUT_MRC_DIR)) + os.sep + "*.mrc"))
@@ -159,6 +201,7 @@ def main():
 
     print(f"\n완료 {ok}개, 스킵 {skip}개, 실패 {fail}개")
     print(f"PNG/SVG: {OUT_PNGSVG_DIR}")
+    print(f"No scale bar: {OUT_NOBAR_DIR}")
 
 
 if __name__ == "__main__":

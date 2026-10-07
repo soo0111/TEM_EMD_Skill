@@ -21,6 +21,7 @@ import numpy as np
 # ===== CONFIG =====
 INPUT_DIR = Path.cwd()
 OUT_PNGSVG_DIR = INPUT_DIR / "Scalebar"
+OUT_NOBAR_DIR = INPUT_DIR / "NoScalebar"   # same images without the bar, for editing
 OUT_MRC_DIR = INPUT_DIR / "MRC"
 
 CMAP = "gray"
