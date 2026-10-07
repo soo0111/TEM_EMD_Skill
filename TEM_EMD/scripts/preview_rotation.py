@@ -5,6 +5,7 @@ Run with the data folder as cwd (after process_emd.py):
 Writes RotationPreview/<prefix>_CCW<deg>.png/.svg, _CW<deg>.png/.svg and <prefix>_compare.png.
 """
 import glob
+import os
 import sys
 from pathlib import Path
 
@@ -19,7 +20,7 @@ OUT_DIR = INPUT_DIR / "RotationPreview"
 
 def main(prefix, deg):
     OUT_DIR.mkdir(exist_ok=True)
-    (path,) = glob.glob(str(OUT_MRC_DIR / f"{prefix} *.mrc"))
+    (path,) = glob.glob(glob.escape(str(OUT_MRC_DIR)) + os.sep + f"{prefix} *.mrc")
     arr, px = load_upright(Path(path))
 
     tag = f"{deg:g}".replace(".", "_").replace("-", "")

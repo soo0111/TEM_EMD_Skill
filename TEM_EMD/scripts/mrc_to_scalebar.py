@@ -9,6 +9,7 @@ Reads MRC/*.mrc, writes Scalebar/<stem>.png/.svg. MRC is un-flipped on both axes
 """
 import argparse
 import glob
+import os
 import traceback
 from pathlib import Path
 
@@ -139,7 +140,7 @@ def main():
     OUT_PNGSVG_DIR.mkdir(exist_ok=True)
     selftest()
 
-    files = sorted(Path(p) for p in glob.glob(str(OUT_MRC_DIR / "*.mrc")))
+    files = sorted(Path(p) for p in glob.glob(glob.escape(str(OUT_MRC_DIR)) + os.sep + "*.mrc"))
     print(f"{len(files)}개 .mrc 발견, HRTEM 회전: CCW {args.ccw:g} deg", flush=True)
 
     ok = skip = fail = 0
