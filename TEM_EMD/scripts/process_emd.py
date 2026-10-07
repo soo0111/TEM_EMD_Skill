@@ -9,6 +9,7 @@ with flip="both". mrc_to_scalebar.py undoes it (both axes; a one-axis undo would
 mirror lattice images).
 """
 import glob
+import os
 import math
 import sys
 import tempfile
@@ -20,6 +21,7 @@ import numpy as np
 # ===== CONFIG =====
 INPUT_DIR = Path.cwd()
 OUT_PNGSVG_DIR = INPUT_DIR / "Scalebar"
+OUT_NOBAR_DIR = INPUT_DIR / "NoScalebar"   # same images without the bar, for editing
 OUT_MRC_DIR = INPUT_DIR / "MRC"
 
 CMAP = "gray"
@@ -190,7 +192,7 @@ def selftest():
 def process_file(path):
     import hyperspy.api as hs
 
-    loaded = hs.load(str(path))
+    loaded = hs.load(os.path.relpath(path))  # relative: abs path with [] is treated as a glob
     sigs = loaded if isinstance(loaded, (list, tuple)) else [loaded]
     multi = len(sigs) > 1
     results = []
@@ -217,7 +219,7 @@ def main():
     OUT_MRC_DIR.mkdir(exist_ok=True)
     selftest()
 
-    files = sorted(Path(p) for p in glob.glob(str(INPUT_DIR / "*.emd")))
+    files = sorted(Path(p) for p in glob.glob(glob.escape(str(INPUT_DIR)) + os.sep + "*.emd"))
     print(f"{len(files)}개 .emd 발견 ({INPUT_DIR})", flush=True)
 
     ok = fail = 0
