@@ -39,6 +39,7 @@ Or run the scripts by hand from the data folder:
 python TEM_EMD/scripts/process_emd.py                  # EMD -> MRC/
 python TEM_EMD/scripts/preview_rotation.py 0023 2.1    # CCW vs CW preview
 python TEM_EMD/scripts/mrc_to_scalebar.py --ccw 2.1    # PNG/SVG in Scalebar/ + NoScalebar/ (negative = clockwise)
+python TEM_EMD/scripts/fix_mrc_angstrom.py MRC         # once, for MRC folders made before 2026-10-12 (header nm/µm -> Å)
 ```
 
 EDS colour maps (after `process_emd.py`):

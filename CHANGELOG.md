@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-10-12
+
+### Fixed
+- **MRC pixel size was 10× (nm) or 10⁴× (µm) too small in other MRC readers.** The MRC standard stores the
+  voxel size in Å, but `process_emd.py` wrote the raw EMD axis number (nm, or µm at low magnification).
+  DigitalMicrograph, Fiji and IMOD therefore showed a 5 nm feature as 5 Å. This skill's own PNG/SVG scale
+  bars were correct, because `load_upright()` read the unit from the `.mrc.txt` sidecar.
+  `process_emd.py` now writes Å and marks the sidecar with `ANGSTROM_TAG`. `load_upright()` reads tagged
+  files as Å and older, untagged files by their sidecar unit, so old folders still render correctly.
+
+### Added
+- `fix_mrc_angstrom.py <dir> [...]`: converts existing MRC headers to Å in place. Only the 8 bytes of `cella.x/y`
+  are rewritten; pixel data is untouched. It can be rerun safely: tagged files are skipped, a header that does not
+  match its sidecar is left alone, and files locked by another program (e.g. open in DigitalMicrograph) are
+  listed and skipped.
+- Self-checks: `process_emd.py` expects 2.5 nm → 25 Å in the header; `fix_mrc_angstrom.py` checks the nm and µm
+  cases, idempotency, and that pixel data is untouched.
+
 ## 2026-10-07
 
 ### Fixed

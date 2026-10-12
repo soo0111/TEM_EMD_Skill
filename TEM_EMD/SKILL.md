@@ -86,9 +86,14 @@ Everything writes to `EDS Data/`. Run `python "$SKILL_DIR/scripts/eds_map.py" <s
 - Contrast: 1–99 percentile stretch. Scale bar: white bar, bold label, bottom-right, length ≈ 25% width
   rounded to 1/2/5×10ⁿ nm (label in µm from 1000 nm), font size ∝ image width (25 pt at 1024 px) so labels look the
   same across sizes.
-- Pixel size unit: Velox stores low-magnification axes in **µm** and high-magnification ones in nm. The MRC header has
-  no unit, so the MRC voxel size keeps the EMD number and `load_upright()` converts it to nm with the unit from the
-  `.mrc.txt` sidecar. Keep the sidecar next to its MRC.
+- Pixel size unit: Velox stores low-magnification axes in **µm** and high-magnification ones in nm. The MRC standard
+  fixes the header unit to **Å**, so `process_emd.py` converts every length axis to Å (`_to_angstrom`) and writes
+  `ANGSTROM_TAG` into the `.mrc.txt` sidecar. `load_upright()` returns nm: Å/10 for tagged sidecars, otherwise the
+  sidecar axis unit (old files). Keep the sidecar next to its MRC.
+- MRCs made **before 2026-10-12** kept the raw nm/µm number in the header, so Fiji/IMOD/DM showed them 10× (nm) or
+  10⁴× (µm) too small, while this skill's own PNG scale bars were right. Fix old folders in place (header bytes only,
+  idempotent): `python fix_mrc_angstrom.py <MRC dir> [...]`. Close the files in DigitalMicrograph first; locked files
+  are skipped and listed.
 - Rotation: bicubic; scipy positive angle = counter-clockwise on screen; then the largest centred square without
   empty corners is cropped (so rotated HRTEM outputs are square and slightly smaller; the scale bar is
   recomputed for the cropped width). STEM images are never rotated.
@@ -106,6 +111,7 @@ Everything writes to `EDS Data/`. Run `python "$SKILL_DIR/scripts/eds_map.py" <s
 - Long MRC step: log is buffered — check `MRC/` file count for progress.
 - Mixed pixel sizes and units are fine: each image uses its own MRC voxel size and sidecar unit for the scale bar.
   MRC folders made before 2026-10-07 do not need re-conversion; rerun `mrc_to_scalebar.py` to fix old µm labels.
+  For other MRC viewers, run `fix_mrc_angstrom.py` on any MRC folder made before 2026-10-12.
 - Assumes Thermo Fisher Velox `.emd` and `Camera Ceta` in HRTEM filenames; change `HRTEM_MARK` in `mrc_to_scalebar.py` for other cameras.
 - The rotation angle is session-specific (one session needed CCW 2.1°) — always preview, never reuse blindly.
 - **EDS maps are qualitative.** Counts are very sparse (often 0.02–0.1 per pixel per element), so even filtered maps show ~30–60 %
