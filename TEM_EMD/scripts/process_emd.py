@@ -43,9 +43,12 @@ _MRC_OK = {"int8", "int16", "uint8", "uint16", "float32", "complex64"}
 _UNIT_TO_NM = {
     "nm": 1.0, "nanometer": 1.0, "nanometre": 1.0,
     "µm": 1e3, "um": 1e3, "micron": 1e3, "micrometer": 1e3, "micrometre": 1e3,
-    "Å": 0.1, "a": 0.1, "angstrom": 0.1, "ångström": 0.1,
+    "Å": 0.1, "å": 0.1, "a": 0.1, "angstrom": 0.1, "ångström": 0.1,
     "pm": 1e-3, "mm": 1e6,
 }
+# MRC headers are always Å. Sidecars of MRCs written after the 2026-10-12 fix carry this line;
+# older MRCs kept the raw EMD number (nm or µm) in the header, which other MRC readers show 10x / 10^4x too small.
+ANGSTROM_TAG = "voxel size unit : Å (MRC standard)"
 
 
 # ===== scale bar helpers (imported by mrc_to_scalebar.py) =====
@@ -78,16 +81,22 @@ def _safe(name):
     return out or "signal"
 
 
+def _to_angstrom(ax):
+    """Axis scale in Å for length units (MRC header unit); other units (eV, 1/nm) pass through unchanged."""
+    f = _UNIT_TO_NM.get(str(ax.units).strip().lower())
+    return ax.scale * f * 10.0 if f else ax.scale
+
+
 def _voxel_size(sig):
     am = sig.axes_manager
     sig_ax = list(am.signal_axes)
     nav_ax = list(am.navigation_axes)
     if sig.data.ndim == 2 and len(sig_ax) == 2:
-        sx, sy, sz = sig_ax[0].scale, sig_ax[1].scale, 1.0
+        sx, sy, sz = _to_angstrom(sig_ax[0]), _to_angstrom(sig_ax[1]), 1.0
     elif sig.data.ndim == 3:
-        sx = nav_ax[0].scale if len(nav_ax) > 0 else 1.0
-        sy = nav_ax[1].scale if len(nav_ax) > 1 else 1.0
-        sz = sig_ax[0].scale if len(sig_ax) == 1 else 1.0
+        sx = _to_angstrom(nav_ax[0]) if len(nav_ax) > 0 else 1.0
+        sy = _to_angstrom(nav_ax[1]) if len(nav_ax) > 1 else 1.0
+        sz = _to_angstrom(sig_ax[0]) if len(sig_ax) == 1 else 1.0
     else:
         sx = sy = sz = 1.0
     return tuple(float(v) if np.isfinite(v) and v > 0 else 1.0 for v in (sx, sy, sz))
@@ -111,6 +120,7 @@ def _sidecar_text(sig, src, arr, flip):
         f"array shape     : {arr.shape}",
         f"dtype in -> out : {sig.data.dtype} -> {arr.dtype}",
         f"spatial flip    : {flip}",
+        ANGSTROM_TAG,
         "axes:",
     ]
     for ax in sig.axes_manager._axes:
@@ -184,7 +194,8 @@ def selftest():
         with mrcfile.open(str(out)) as m:
             assert np.allclose(m.data, data[::-1, ::-1, :])
             vs = m.voxel_size
-            assert (round(float(vs.x), 3), round(float(vs.y), 3), round(float(vs.z), 3)) == (2.5, 2.5, 10.0)
+            # 2.5 nm -> 25 Å in the header (MRC standard); the eV axis is not a length and passes through
+            assert (round(float(vs.x), 3), round(float(vs.y), 3), round(float(vs.z), 3)) == (25.0, 25.0, 10.0)
     print("selftest OK")
 
 

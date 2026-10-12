@@ -6,7 +6,8 @@ Run with the data folder as cwd:
     python mrc_to_scalebar.py --ccw -2.1      # ... clockwise
 Reads MRC/*.mrc, writes Scalebar/<stem>.png/.svg and the same without bar in NoScalebar/.
 MRC is un-flipped on both axes (process_emd.py flips both). HRTEM = filename contains HRTEM_MARK ("Camera Ceta").
-MRC voxel size is in the EMD axis unit (nm, or µm at low mag); the unit is read from the .mrc.txt sidecar.
+MRC voxel size is in Å (MRC standard). MRCs written before 2026-10-12 hold the raw EMD number (nm, or µm at low
+mag) instead; their sidecar lacks ANGSTROM_TAG, so the unit is read from the sidecar's axes (fix them with fix_mrc_angstrom.py).
 """
 import argparse
 import glob
@@ -22,7 +23,7 @@ import scipy.ndimage as ndi
 from matplotlib.patches import Rectangle
 
 from process_emd import (
-    _UNIT_TO_NM, _font_size_pt, _scalebar, _spatial_flip,
+    ANGSTROM_TAG, _UNIT_TO_NM, _font_size_pt, _scalebar, _spatial_flip,
     CMAP, DPI, OUT_MRC_DIR, OUT_NOBAR_DIR, OUT_PNGSVG_DIR,
     SCALEBAR_COLOR, SCALEBAR_FONT_WEIGHT,
     SCALEBAR_HEIGHT_FRACTION, SCALEBAR_LABEL_GAP_FRACTION, SCALEBAR_MARGIN_FRACTION,
@@ -74,10 +75,14 @@ def _is_2d_image(path):
 
 
 def _nm_per_unit(path):
-    """nm per MRC voxel-size unit, from the .mrc.txt sidecar written by process_emd.py
-    (Velox gives µm at low magnification, nm at high; the MRC header has no unit)."""
+    """nm per MRC voxel-size unit, from the .mrc.txt sidecar written by process_emd.py.
+    Tagged sidecar: header in Å (MRC standard). Untagged (pre-2026-10-12): header holds the EMD axis unit
+    (Velox gives µm at low magnification, nm at high)."""
     side = Path(f"{path}.txt")
-    m = re.search(r"units='([^']*)'", side.read_text(encoding="utf-8")) if side.exists() else None
+    text = side.read_text(encoding="utf-8") if side.exists() else ""
+    if ANGSTROM_TAG in text:
+        return 0.1
+    m = re.search(r"units='([^']*)'", text)
     unit = m.group(1).strip().lower() if m else None
     if unit in _UNIT_TO_NM:
         return _UNIT_TO_NM[unit]
